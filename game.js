@@ -118,6 +118,70 @@
   function sfxWin() { [523, 659, 784, 1047].forEach(function (f, i) { setTimeout(function () { beep(f, 0.18, "sine", 0.15); }, i * 110); }); }
   function sfxLose() { beep(160, 0.35, "sawtooth", 0.08); }
 
+  /* ---------- fx: particles, score popups, shake/flash ---------- */
+  var fxEl = $("fx");
+  var reduceMotion = false;
+  try { reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) {}
+  function fxOk() { return fxEl && typeof fxEl.animate === "function" && !reduceMotion; }
+  function fxCount(base) {
+    // fewer particles on small screens so phones hold 60fps
+    return window.innerWidth < 480 ? Math.ceil(base / 2) : base;
+  }
+  function tileCenterPx(r, c) {
+    var p = pos(r, c);
+    return { x: p.x + p.s / 2, y: p.y + p.s / 2 };
+  }
+  function burst(r, c, value) {
+    if (!fxOk()) return;
+    var center = tileCenterPx(r, c);
+    var colors = value >= 512 ? ["#ffd27a", "#ff7b54", "#fff3c4"]
+      : value >= 64 ? ["#ffb347", "#ff9e5e", "#ffe1a8"]
+      : ["#ffe1a8", "#ffb347"];
+    var n = fxCount(value >= 128 ? 16 : 10);
+    for (var i = 0; i < n; i++) {
+      var ang = Math.random() * Math.PI * 2;
+      var dist = 26 + Math.random() * 42;
+      var size = 4 + Math.random() * 5;
+      var p = document.createElement("div");
+      p.className = "particle";
+      var col = colors[i % colors.length];
+      p.style.width = size + "px";
+      p.style.height = size + "px";
+      p.style.left = (center.x - size / 2) + "px";
+      p.style.top = (center.y - size / 2) + "px";
+      p.style.background = col;
+      p.style.color = col;
+      fxEl.appendChild(p);
+      var dx = Math.cos(ang) * dist, dy = Math.sin(ang) * dist;
+      var anim = p.animate([
+        { transform: "translate(0,0) scale(1)", opacity: 1 },
+        { transform: "translate(" + dx + "px," + dy + "px) scale(0.2)", opacity: 0 }
+      ], { duration: 420 + Math.random() * 180, easing: "cubic-bezier(.1,.7,.3,1)" });
+      anim.onfinish = (function (el) { return function () { el.remove(); }; })(p);
+    }
+  }
+  function scorePopup(r, c, points) {
+    if (!fxOk()) return;
+    var center = tileCenterPx(r, c);
+    var el = document.createElement("div");
+    el.className = "score-pop";
+    el.textContent = "+" + points;
+    el.style.left = center.x + "px";
+    el.style.top = (center.y - 14) + "px";
+    fxEl.appendChild(el);
+    var anim = el.animate([
+      { transform: "translate(-50%,0)", opacity: 1 },
+      { transform: "translate(-50%,-46px)", opacity: 0 }
+    ], { duration: 800, easing: "ease-out" });
+    anim.onfinish = function () { el.remove(); };
+  }
+  function bigMergeFeedback() {
+    if (reduceMotion) return;
+    boardEl.classList.remove("shake"); void boardEl.offsetWidth; boardEl.classList.add("shake");
+    boardEl.classList.remove("flash"); void boardEl.offsetWidth; boardEl.classList.add("flash");
+    setTimeout(function () { boardEl.classList.remove("flash"); }, 500);
+  }
+
   /* ---------- rendering ---------- */
   // Build the 16 background cells once.
   var cellsEl = boardEl.querySelector(".cells");
@@ -140,7 +204,12 @@
     var el = document.createElement("div");
     el.className = "tile t" + tile.value;
     el.dataset.id = tile.id;
-    el.textContent = tile.value;
+    // Number lives in an inner face so pop animations (scale) never fight
+    // the tile's own translate() slide positioning.
+    var face = document.createElement("span");
+    face.className = "tile-face";
+    face.textContent = tile.value;
+    el.appendChild(face);
     var p = pos(tile.r, tile.c);
     el.style.width = p.s + "px";
     el.style.height = p.s + "px";
@@ -294,6 +363,17 @@
         var el = tilesEl.querySelector('[data-id="' + id + '"]');
         if (el) el.classList.add("merged");
       });
+      // fx: sparkle burst per merge, one floating +points popup, shake+flash on big merges
+      var mergeSpots = [];
+      dest.forEach(function (d) {
+        if (d.merge) mergeSpots.push({ r: d.toR, c: d.toC, v: res.grid[d.toR][d.toC] });
+      });
+      mergeSpots.forEach(function (m) { burst(m.r, m.c, m.v); });
+      if (res.gained > 0 && mergeSpots.length) {
+        var big = mergeSpots.reduce(function (a, b) { return b.v > a.v ? b : a; });
+        scorePopup(big.r, big.c, res.gained);
+        if (big.v >= 128) bigMergeFeedback();
+      }
       spawnTile(true);
       animating = false;
       checkEnd();
