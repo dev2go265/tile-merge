@@ -13,6 +13,9 @@
   <section id="title-screen" class="screen">
     <h1 class="logo">Tile<span>Merge</span></h1>
     <p class="tagline">Slide. Merge. Reach <b>2048</b>.</p>
+    <div class="title-tiles" aria-hidden="true">
+      <span class="mini-tile t2">2</span><span class="mini-tile t4">4</span><span class="mini-tile t8">8</span><span class="mini-tile t64">64</span><span class="mini-tile t512">512</span><span class="mini-tile t2048">2048</span>
+    </div>
     <div class="howto">
       <p>Slide the tiles with the <b>arrow keys</b> or <b>WASD</b>.</p>
       <p>On touch screens, <b>swipe</b> or tap the on-screen arrows.</p>
@@ -45,6 +48,7 @@
         <!-- background cells -->
         <div class="cells"></div>
         <div id="tiles"></div>
+        <div id="fx"></div>
       </div>
     </div>
 
